@@ -1,6 +1,6 @@
 # Spring Caching RAG
 
-A Python command-line application that answers questions using the [Spring Boot 4.0 caching documentation](https://docs.spring.io/spring-boot/4.0/reference/io/caching.html). It downloads and splits the page, embeds its passages through Nebius, stores them in Pinecone, and uses a LangGraph workflow to retrieve evidence and generate cited answers.
+A Python application with a simple Streamlit interface and a command-line interface that answers questions using the [Spring Boot 4.0 caching documentation](https://docs.spring.io/spring-boot/4.0/reference/io/caching.html). It downloads and splits the page, embeds its passages through Nebius, stores them in Pinecone, and uses a LangGraph workflow to retrieve evidence and generate cited answers.
 
 RAG means **retrieval-augmented generation**: search the documentation first, then give the retrieved text to a language model as evidence for its answer. This project covers one documentation page, including its different cache-provider sections. The implementation is Python; Spring Boot is the subject of the documentation.
 
@@ -56,6 +56,7 @@ The preparation scripts run separately in sequence. `app.py` searches the popula
 | [`upload_pinecone.py`](upload_pinecone.py) | Checks input limits and Pinecone configuration, creates or reuses document embeddings, and upserts vectors with passage metadata. |
 | [`retrieve.py`](retrieve.py) | Retrieval-only diagnostic: embeds one question and prints the top three passages, scores, source URLs, and embedding usage. |
 | [`app.py`](app.py) | Defines the LangGraph workflow through `build_app(client, index)` and runs the interactive question loop. |
+| [`streamlit_app.py`](streamlit_app.py) | Provides a browser interface with a question form, the answer, timing, and expandable source passages. Loads API keys from local Streamlit secrets and reuses `build_app` from `app.py`. |
 | [`evaluate.py`](evaluate.py) | Runs the same workflow against 15 questions, saving results after every question for later human review. |
 | [`test_nebius.py`](test_nebius.py) | Makes one live chat-completion request to check Nebius connectivity. |
 | [`test_embeddings.py`](test_embeddings.py) | Makes one live embedding request and prints vector dimensions, usage, and a cost estimate. |
@@ -78,7 +79,7 @@ These values are configured directly in the Python files:
 | Main application retrieval | Top 5 per query; at most 8 merged passages for compound questions |
 | Answer output limit | `max_tokens=600`; thinking disabled through `chat_template_kwargs` |
 
-The OpenAI Python SDK is used as a client for Nebius's compatible API. The scripts prompt for API keys with hidden terminal input using `getpass`; they do not load a `.env` file. Nebius clients use `max_retries=0`; the main application and uploader use a 60-second request timeout.
+The OpenAI Python SDK is used as a client for Nebius's compatible API. The CLI scripts prompt for API keys with hidden terminal input using `getpass`; the Streamlit interface reads them from `.streamlit/secrets.toml` without displaying key fields. Neither interface loads a `.env` file. Nebius clients use `max_retries=0`; the main application, Streamlit interface, and uploader use a 60-second request timeout.
 
 ## Setup
 
@@ -163,6 +164,31 @@ How do I enable caching and then configure Redis cache expiration?
 
 The application prints the answer, numbered evidence IDs with similarity scores and source URLs, and total elapsed time. Keys remain available within that process so you can ask multiple questions. Every question is independent; prior questions and answers are not passed to the model.
 
+### 5. Use the simple browser interface
+
+After installing the requirements and populating Pinecone, copy the example configuration:
+
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+```
+
+If `.streamlit/secrets.toml` already exists, edit the existing file instead of copying over it. Before recording your demo, fill in the two values in this local file:
+
+```toml
+PINECONE_API_KEY = "your-pinecone-key"
+NEBIUS_API_KEY = "your-nebius-key"
+```
+
+The real `secrets.toml` is excluded from Git; the example contains no credentials. Start or restart the app after saving the configuration:
+
+```bash
+python -m streamlit run streamlit_app.py
+```
+
+Open `http://localhost:8501`, type a question, and click **Ask**. The page displays the answer and response time. Expand each numbered source to read the retrieved passage and see its similarity score and documentation URL. There are no API-key fields on the page. For a recording, finish configuring the keys first and record only the browser window.
+
+The interface uses a [Streamlit form](https://docs.streamlit.io/develop/api-reference/execution-flow/st.form) so typing does not trigger API requests. Each submitted question uses the existing RAG workflow and may incur API usage. It searches your existing Pinecone data without re-uploading documents. Keys are read on the server using [Streamlit secrets management](https://docs.streamlit.io/develop/concepts/connections/secrets-management). The latest result stays visible across page interactions; earlier answers are not sent as conversation history. Live questions still require valid API keys and the populated index.
+
 ## How the question workflow works
 
 The LangGraph state has three fields: `question`, `passages`, and `answer`.
@@ -220,4 +246,4 @@ Both saved reports contain **15 completed questions**. The hash in `evaluation_r
 | `evaluation_results.json` | Earlier evaluation snapshot |
 | `evaluation_results_v2.json` | Evaluation snapshot matching the inspected application source |
 
-The local cache avoids repeating document embedding requests. Question embeddings and generated answers are not cached. The project has no web interface, conversation memory, automatic quality grader, or multi-document ingestion pipeline; those would require additional implementation.
+The local cache avoids repeating document embedding requests. Question embeddings and generated answers are not reused to skip API requests; the Streamlit interface retains only the latest result for display. The project has no conversation memory, automatic quality grader, or multi-document ingestion pipeline; those would require additional implementation.

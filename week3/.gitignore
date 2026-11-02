@@ -1,0 +1,6 @@
+.state/
+
+# Local preparation notes; source, tests and README are published.
+ACCEPTANCE.md
+SUBMISSION.md
+GITHUB_REVIEW.md

@@ -1,0 +1,2 @@
+# Reuse the installed Week 2 SDK; no upgrade is required for this probe.
+openai==3.31.0

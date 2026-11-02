@@ -8,7 +8,20 @@ __pycache__/
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+**/secrets.toml
 .DS_Store
 
 # Rebuildable document embedding cache
 embeddings_cache.json
+
+# Local runtime state and logs
+.state/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.log
+
+# Local demonstration scripts
+DEMO.md
+demo.md
